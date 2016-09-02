@@ -229,7 +229,6 @@ public class RabbitMQAdapterListener implements Runnable {
                 }
                 boolean successful = false;
                 QueueingConsumer.Delivery delivery = null;
-
                 try {
                     if (log.isDebugEnabled()) {
                         log.debug("Waiting for next delivery from queue for receiver ");
@@ -279,7 +278,6 @@ public class RabbitMQAdapterListener implements Runnable {
     }
 
     public void stopListener(String adapterName) {
-
         if (connection != null && connection.isOpen()) {
             try {
                 connection.close();
@@ -290,9 +288,7 @@ public class RabbitMQAdapterListener implements Runnable {
                 connection = null;
             }
         }
-        workerState = STATE_STOPPED;
-        connectionSucceeded = true;
-        if (channel != null && channel.isOpen()) {
+ 	if (channel != null && channel.isOpen()) {
             try {
                 channel.close();
                 log.info("RabbitMQ channel closed for receiver " + adapterName);
@@ -302,6 +298,7 @@ public class RabbitMQAdapterListener implements Runnable {
                 channel = null;
             }
         }
+        connectionSucceeded = true;
     }
 
     private Connection makeConnection() throws IOException {
@@ -312,7 +309,7 @@ public class RabbitMQAdapterListener implements Runnable {
         } catch (IOException e) {
             handleException("Error creating connection to RabbitMQ Broker. Reattempting to connect.", e);
             int retryC = 0;
-            while ((connection == null) && (workerState == STATE_STARTED) && ((retryCountMax == -1) || (retryC < retryCountMax))) {
+            while ((connection == null) && ((retryCountMax == -1) || (retryC < retryCountMax))) {
                 retryC++;
                 log.info("Attempting to create connection to RabbitMQ Broker" + adapterName +
                         " in " + retryInterval + " ms");
@@ -321,11 +318,13 @@ public class RabbitMQAdapterListener implements Runnable {
                     connection = RabbitMQUtils.createConnection(connectionFactory);
                     log.info("Successfully connected to RabbitMQ Broker" + adapterName);
                 } catch (InterruptedException e1) {
-                    handleException("Thread has been interrupted while trying to reconnect to RabbitMQ Broker " + adapterName, e1);
+                    handleException("Thread has been interrupted while trying to reconnect to RabbitMQ Broker "
+                            + adapterName, e1);
                 }
             }
             if (connection == null) {
-                handleException("Could not connect to RabbitMQ Broker" + adapterName + "Error while creating connection", e);
+                handleException("Could not connect to RabbitMQ Broker" + adapterName + "Error while creating" +
+                        " connection", e);
             }
         }
         return connection;
@@ -334,9 +333,13 @@ public class RabbitMQAdapterListener implements Runnable {
     private Connection getConnection() throws IOException {
         if (connection == null) {
             connection = makeConnection();
-            connectionSucceeded = true;
+            setConnected(true);
         }
         return connection;
+    }
+
+    public void setConnected(boolean connectionSucceeded) {
+        this.connectionSucceeded = connectionSucceeded;
     }
 
     public void createConnection() {
@@ -364,10 +367,11 @@ public class RabbitMQAdapterListener implements Runnable {
             } catch (IOException e) {
                 handleException("Error initializing consumer for receiver" + adapterName, e);
             } finally {
-                stopListener(adapterName);
+                startListener();
                 workerState = STATE_STOPPED;
             }
         }
+
     }
 
     private void handleException(String msg, Exception e) {
@@ -382,10 +386,11 @@ public class RabbitMQAdapterListener implements Runnable {
 
     private void waitForConnection() throws IOException {
         int retryCount = 0;
-        while (!connection.isOpen() && (workerState == STATE_STARTED)
+        while (!connection.isOpen()
                 && ((retryCountMax == -1) || (retryCount < retryCountMax))) {
             retryCount++;
-            log.info("Attempting to reconnect to RabbitMQ Broker for the receiver " + adapterName + " in" + retryInterval + " ms");
+            log.info("Attempting to reconnect to RabbitMQ Broker for the receiver " + adapterName + " " +
+                    "in" + retryInterval + " ms");
             try {
                 Thread.sleep(retryInterval);
             } catch (InterruptedException e) {
@@ -396,7 +401,8 @@ public class RabbitMQAdapterListener implements Runnable {
             log.info("Successfully reconnected to RabbitMQ Broker for the receiver " + adapterName);
             initListener();
         } else {
-            handleException("Could not reconnect to the RabbitMQ Broker for the receiver " + adapterName + ". Connection is closed.");
+            handleException("Could not reconnect to the RabbitMQ Broker for the receiver " + adapterName +
+                    ". Connection is closed.");
         }
     }
 
